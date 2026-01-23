@@ -974,7 +974,7 @@ function showBlockedScreen(reasonText){
   if(btnWA){
     btnWA.onclick = ()=>{
       try{
-        const tel = window.__CONFIG_PHONE_DIGITS || '573206559932';
+        const tel = window.__CONFIG_PHONE_DIGITS || '571111111111';
         const msg = 'Hola, intento ingresar pero la página está inhabilitada. ¿Me puedes ayudar?';
         const url = 'https://wa.me/' + tel + '?text=' + encodeURIComponent(msg);
         const w = window.open(url, '_blank');
@@ -1194,7 +1194,7 @@ function closeBox(withScale){
 
 /* Abrir WhatsApp */
 function openWA(payload){
-  const tel = window.__CONFIG_PHONE_DIGITS || '573206559932';
+  const tel = window.__CONFIG_PHONE_DIGITS || '571111111111';
   let message = '';
 
   if (Array.isArray(payload)) {
@@ -1402,7 +1402,7 @@ function applyConfig({name,phoneRaw,address,logo}){
     const b = document.getElementById('bootLogoImg'); if(b && !b.src) b.src = baseLogo;
   }
 
-  window.__CONFIG_PHONE_DIGITS = extractColombiaDigits(phoneRaw) || '573206559932';
+  window.__CONFIG_PHONE_DIGITS = extractColombiaDigits(phoneRaw) || '571111111111';
 }
 
 /* =========================
