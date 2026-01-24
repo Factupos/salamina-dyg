@@ -784,6 +784,9 @@ const PROXY = 'https://csv-proxy.jeisendigital.workers.dev/?u=';
    - Logo: Notificaciones!D2 (por defecto)
    ========================================================= */
 const BLOCK_SHEET_NAME = 'Configuracion';
+const WA_SHEET_NAME = 'Configuracion';
+const WA_CELL_RANGE  = 'L2:L2';   // ✅ ÚNICO WhatsApp permitido (Configuracion!L2)
+
 const BLOCK_CELL_RANGE = 'X2:X2';
 const LOGO_CELL_RANGE  = 'D2:D2';   // ← si tu logo está en otra fila, cambia aquí (ej: D3:D3)
 
@@ -972,11 +975,19 @@ function showBlockedScreen(reasonText){
   // WhatsApp
   const btnWA = document.getElementById('blockedWhatsApp');
   if(btnWA){
+    // Si no hay WhatsApp validado, no permitir abrir enlace
+    const telReady = (window.__WHATSAPP_DIGITS || window.__CONFIG_PHONE_DIGITS || '').trim();
+    if(!telReady){
+      btnWA.disabled = true;
+      btnWA.style.opacity = '0.6';
+      btnWA.style.cursor = 'not-allowed';
+      btnWA.textContent = 'WhatsApp no configurado';
+    }
     btnWA.onclick = ()=>{
       try{
-        const tel = window.__CONFIG_PHONE_DIGITS || '571111111111';
+        const tel = window.__WHATSAPP_DIGITS || window.__CONFIG_PHONE_DIGITS || '';
         const msg = 'Hola, intento ingresar pero la página está inhabilitada. ¿Me puedes ayudar?';
-        const url = 'https://wa.me/' + tel + '?text=' + encodeURIComponent(msg);
+        if(!tel) return; const url = 'https://wa.me/' + tel + '?text=' + encodeURIComponent(msg);
         const w = window.open(url, '_blank');
         if(!w) location.href = url;
       }catch(_){}
@@ -1095,6 +1106,37 @@ function extractColombiaDigits(raw){
   return null;
 }
 
+/* =========================================================
+   ✅ WHATSAPP ÚNICO (Config. interna: Configuracion!L2)
+   - Elimina por completo cualquier número por defecto.
+   - La app NO inicia si no logra leer/validar este número.
+   ========================================================= */
+function parseSingleCellFromCsv(text){
+  const rows = parseCSV(text);
+  return rows?.[1]?.[0] ?? rows?.[0]?.[0] ?? '';
+}
+function normalizeWhatsAppDigitsStrict(raw){
+  const digits = extractColombiaDigits(raw);
+  // En Colombia: '57' + 10 dígitos (celular 3xxxxxxxxx) => total 12
+  if(!digits || !/^57\d{10}$/.test(digits)) return null;
+  return digits;
+}
+async function loadWhatsAppDigitsStrict(){
+  // ⚠️ Importante: NO usar caché como "seguridad". Se exige lectura real al abrir.
+  const txt = await fetchCsvBySheetRange(WA_SHEET_NAME, WA_CELL_RANGE, 5500);
+  const cell = parseSingleCellFromCsv(txt);
+  const digits = normalizeWhatsAppDigitsStrict(cell);
+  if(!digits){
+    throw new Error('WhatsApp inválido en Configuracion!L2: ' + String(cell||'').trim());
+  }
+  // Único origen válido para WhatsApp en toda la página
+  window.__WHATSAPP_DIGITS = digits;
+  // Mantener compatibilidad con variables existentes en el código
+  window.__CONFIG_PHONE_DIGITS = digits;
+  return digits;
+}
+
+
 /* Recalcular altura del header cuando aparece/desaparece el carrito */
 function recalcHeaderHeightDynamic(){
   const hEl = document.querySelector('header');
@@ -1194,7 +1236,7 @@ function closeBox(withScale){
 
 /* Abrir WhatsApp */
 function openWA(payload){
-  const tel = window.__CONFIG_PHONE_DIGITS || '571111111111';
+  const tel = window.__WHATSAPP_DIGITS || window.__CONFIG_PHONE_DIGITS || '';
   let message = '';
 
   if (Array.isArray(payload)) {
@@ -1402,7 +1444,9 @@ function applyConfig({name,phoneRaw,address,logo}){
     const b = document.getElementById('bootLogoImg'); if(b && !b.src) b.src = baseLogo;
   }
 
-  window.__CONFIG_PHONE_DIGITS = extractColombiaDigits(phoneRaw) || '571111111111';
+  /* WhatsApp se toma ÚNICAMENTE de Configuracion!L2 (ver loadWhatsAppDigitsStrict) */
+  // window.__CONFIG_PHONE_DIGITS se define al validar Configuracion!L2
+
 }
 
 /* =========================
@@ -1749,6 +1793,16 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   if(isBlocked === true){
     showBlockedScreen('Acceso restringido por configuración (Configuracion!X2 = TRUE).');
     return; // ⛔ no continúa la app
+  }
+
+  // ✅ WHATSAPP ÚNICO (Config. interna)
+  bootSet(34, 'Verificando WhatsApp…', 'Leyendo Configuracion!L2');
+  try{
+    await loadWhatsAppDigitsStrict();
+  }catch(err){
+    // No iniciar si no hay validación real del WhatsApp
+    showBlockedScreen('No se pudo validar el número de WhatsApp (Configuracion!L2).\n\nRevisa que L2 tenga un celular válido (ej: 3XXXXXXXXX) y que la hoja sea accesible para lectura.');
+    return;
   }
 
   // Inputs
